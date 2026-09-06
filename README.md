@@ -2,17 +2,19 @@
 
 "Know what you're teaching tomorrow. Be ready tonight."
 
-A mobile-first PWA for lesson prep: add the classes you teach, prepare each one with AI, and watch your readiness reach 100%. Installable to a phone home screen or desktop, with basic offline support.
+A mobile-first PWA for GES-aligned lesson prep. Add your classes with the exact days each one runs, optionally track a term-by-term Scheme of Work, and prepare each lesson with AI — Strand, Sub-strand, Content Standard, Indicator, and full Starter/Main/Plenary phases, in the format expected of an official GES lesson note.
 
 ## How to use it
 
-1. **Add your classes.** Tap **+** on the Tomorrow screen and add each class you teach tomorrow — one subject, two, or a full timetable. There's no fixed number; a computing-only teacher just adds one lesson, a teacher with six subjects adds six.
-2. **Connect AI once.** The first time you tap "Prepare with AI," you'll be asked for a Groq API key ([console.groq.com](https://console.groq.com) → API Keys). It's saved in this browser's local storage, on this device only.
-3. **Prepare a lesson.** Open a lesson and tap **Prepare with AI** for a full draft, or **10 min** when you're short on time.
-4. **Refine anything.** Edit a section directly, or type an instruction into "Ask AI to adjust this" (e.g. "make it shorter," "add a real-world example") to rewrite just that part — the rewrite streams in live.
-5. **Track readiness.** The ring on each lesson fills in as sections are completed. Edit or delete a lesson any time via the pencil icon on its row.
+1. **Add your classes.** Tap the list icon ("My classes") and add each one — pick exactly which days it runs. A computing-only teacher adds one class; a Mon/Wed/Fri part-timer picks just those three days.
+2. **Set your term (optional but recommended).** In Settings, choose the current term (1/2/3) and the date it started. This is how the app knows which Scheme of Work week tomorrow falls in.
+3. **Add a Scheme of Work (optional).** Edit a class → "Manage Scheme of Work" → add each week's topic (and Strand/Sub-strand/Content Standard/Indicator if you have them) for the term. Tomorrow's lesson picks up the matching week's topic automatically; a "Use this" prompt appears if you update the Scheme of Work after a lesson was already created.
+4. **Connect AI once.** The first time you tap "Prepare with AI," you'll be asked for a Groq API key. It's saved in this browser's local storage, per device.
+5. **Prepare a lesson.** Open a lesson and tap **Prepare with AI** for a full, detailed, GES-aligned draft, or **10 min** when you're short on time.
+6. **Refine anything.** Edit a field directly, or type an instruction into "Ask AI to adjust this" to rewrite just that part — it streams in live.
+7. **Back it up.** Everything lives only in this browser. Download a backup from Settings occasionally (Export) and keep the file somewhere safe; Import restores from it on a new device or after clearing browser data.
 
-This guide is also built into the app — tap the **?** icon next to Add on the Tomorrow screen.
+This guide is also built into the app — tap the **?** icon on the Tomorrow screen.
 
 ## Run it locally
 
@@ -23,11 +25,11 @@ npm install
 npm start
 ```
 
-Opens at http://localhost:3000. Service workers only activate in production builds, so installability and offline caching won't show up in `npm start` — use `npm run build` + a static server to test those (see below).
+Opens at http://localhost:3000. Service workers only activate in production builds — use `npm run build` + a static server to test installability and offline caching.
 
 ## AI setup
 
-**In-app (recommended, and how most people should do this).** Tap the gear icon inside a lesson, paste a Groq key. It's stored in `localStorage` — per browser, per device, never bundled into the app's code, never sent anywhere except Groq's API.
+**In-app (recommended).** Tap the gear icon, paste a Groq key. Stored in `localStorage`, per browser/device — never bundled into the app's code, never sent anywhere except Groq's API.
 
 **Build-time `.env` (local dev convenience only).**
 ```
@@ -35,9 +37,17 @@ cp .env.example .env
 # edit .env and set REACT_APP_GROQ_API_KEY=gsk_...
 npm start
 ```
-⚠️ Don't rely on this for anything you deploy publicly — Create React App bakes `REACT_APP_*` variables into the public JS bundle, readable by anyone who opens dev tools on your live site.
+⚠️ Don't rely on this for a public deployment — `REACT_APP_*` variables are baked into the public JS bundle, readable by anyone.
 
-**If AI requests fail:** the app tries a short list of Groq models in order (in case one gets renamed or retired) and surfaces the actual error as a toast — an invalid/expired key, a rate limit, or a network issue will each say so specifically rather than a generic failure. For a real production deployment serving other people's traffic, the more robust long-term fix is a small backend/serverless function that holds the key server-side and proxies the Groq request, so the key never reaches the browser at all.
+**If AI requests fail:** the app tries a short list of Groq models in order (in case one is renamed or retired) and shows the real error — invalid/expired key, rate limit, or network issue — rather than a generic failure message. For a production deployment serving other people, the more robust long-term fix is a small backend/serverless function holding the key server-side, so it never reaches the browser.
+
+## On data safety — what actually protects your data
+
+Classes, lesson content, and term settings are saved in this browser's `localStorage`, and the app asks the browser to protect that storage from automatic eviction under space pressure (`navigator.storage.persist()`).
+
+Being direct about the limits of that: **no purely client-side storage survives the person manually clearing their browser's site data** — localStorage, IndexedDB, anything — because that's what "clear site data" is specifically designed to wipe. Switching to IndexedDB wouldn't change that; both are cleared together. The one thing that genuinely protects against this is the **Export/Import backup** in Settings — download a JSON backup occasionally and keep it somewhere else (email, Drive). The real long-term fix would be an account + cloud sync, which needs a backend and is a bigger step than this project currently takes.
+
+The Groq API key is deliberately left out of backups — re-enter it per device rather than have it sit in a plaintext file.
 
 ## Build & deploy
 
@@ -45,47 +55,44 @@ npm start
 npm run build
 ```
 
-Outputs a static `build/` folder you can host anywhere serving static files over HTTPS (Netlify, Vercel, GitHub Pages, Cloudflare Pages, etc.) — HTTPS is required for the service worker and for "Add to Home Screen."
+Outputs a static `build/` folder — host anywhere serving static files over HTTPS (Netlify, Vercel, GitHub Pages, Cloudflare Pages). HTTPS is required for the service worker and "Add to Home Screen."
 
-To test the production build locally:
 ```
-npx serve -s build
+npx serve -s build   # test the production build locally
 ```
 
 ## Installing as an app
 
-Once deployed over HTTPS:
-- **Android / desktop Chrome:** the app shows its own "Install" banner, or use the browser's install icon in the address bar.
-- **iOS Safari:** Share → Add to Home Screen (iOS doesn't support the `beforeinstallprompt` banner, so this is the only path there).
+- **Android / desktop Chrome:** the app's own "Install" banner, or the browser's install icon in the address bar.
+- **iOS Safari:** Share → Add to Home Screen (no `beforeinstallprompt` support on iOS).
 
 ## Project structure
 
 ```
 public/
-  index.html          – shell HTML + PWA meta tags
-  manifest.json        – app name, icons, theme colors
-  service-worker.js    – offline caching (network-first w/ cache fallback)
-  icons/                – app icons
+  index.html, manifest.json, service-worker.js, icons/
 src/
-  App.jsx               – root: screen state, persistence, install prompt, modals
+  App.jsx                    – root: state, persistence, auto-generates tomorrow's lessons, modals
   components/
-    Landing.jsx           – one-time welcome screen (skipped after first visit)
-    Home.jsx               – lesson list, add/edit, empty state
-    LessonWorkspace.jsx    – per-lesson prep + AI generation/refine
-    LessonFormModal.jsx    – add/edit/delete a lesson
+    Landing.jsx                 – one-time welcome screen
+    Home.jsx                     – tomorrow's lessons (filtered by weekday), empty states
+    LessonWorkspace.jsx          – GES detail fields + Starter/Main/Plenary/Homework + AI
+    LessonFormModal.jsx          – add/edit a class (subject, class, duration, days taught)
+    ManageCoursesModal.jsx       – list/edit all classes
+    SchemeOfWorkModal.jsx        – per-term, per-week topic list for a class
+    SettingsModal.jsx             – AI key, term settings, backup/restore
+    HelpModal.jsx                  – in-app usage guide
     Tools.jsx / Premium.jsx
-    SettingsModal.jsx      – Groq key entry
-    HelpModal.jsx           – in-app usage guide
-    AppShell.jsx            – bottom nav + screen routing
+    AppShell.jsx                    – bottom nav + screen routing
   lib/
-    data.js              – section schema, mock draft fallbacks, progress helpers
-    groq.js               – Groq API client (model fallback, JSON mode, streaming)
-    storage.js             – localStorage persistence for lessons + API key
-  styles.css             – design tokens + component styles
+    data.js                – GES field schema, courses, Scheme of Work, week-number math
+    groq.js                 – Groq client: model fallback, JSON mode, streaming, GES-aligned prompts
+    storage.js                – localStorage persistence + backup/restore
+  styles.css               – design tokens + component styles
 ```
 
 ## Notes
 
-- Lessons and the API key persist in this browser's `localStorage`. Clearing browser data, or switching devices/browsers, starts fresh — there's no account or backend yet, so nothing syncs across devices.
-- The service worker caches whatever the app has already loaded, so a page needs to be opened once online before it's available offline.
-- The Premium screen is informational only — no payment processor is wired up yet. Hooking up a real one (e.g. Paystack, common in Ghana) would need a small backend to verify payments and isn't something that can live safely in client-only code.
+- A "class" (course) is recurring — subject, class, duration, and the specific weekdays it runs. A "lesson" is one day's actual instance of that class, auto-created for tomorrow when its weekday matches, and holding that day's own content.
+- Week numbers are calculated from your term start date; if you haven't set one, new lessons default to Week 1 until you do.
+- The Premium screen is informational only — no payment processor is wired up. A real one (e.g. Paystack) needs a backend to verify payments safely.
