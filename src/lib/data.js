@@ -1,45 +1,58 @@
 import React from "react";
-import {
-  Target, BookOpen, PenLine, Users, ClipboardList, ShieldCheck, FileText, Library, Lightbulb,
-} from "lucide-react";
+import { Sunrise, BookOpen, ShieldCheck, FileText } from "lucide-react";
 
-export const SECTION_META = [
-  { key: "objectives", label: "Learning objectives", icon: <Target size={16} /> },
-  { key: "intro", label: "Introduction", icon: <BookOpen size={16} /> },
-  { key: "teachingPoints", label: "Teaching points", icon: <PenLine size={16} /> },
-  { key: "activity", label: "Classroom activity", icon: <Users size={16} /> },
-  { key: "practice", label: "Practice", icon: <ClipboardList size={16} /> },
-  { key: "assessment", label: "Assessment", icon: <ShieldCheck size={16} /> },
-  { key: "homework", label: "Homework", icon: <FileText size={16} /> },
-  { key: "materials", label: "Materials", icon: <Library size={16} /> },
-  { key: "notes", label: "Teacher notes", icon: <Lightbulb size={16} /> },
+export const WEEKDAYS = [
+  { key: "Sun", label: "Sun" },
+  { key: "Mon", label: "Mon" },
+  { key: "Tue", label: "Tue" },
+  { key: "Wed", label: "Wed" },
+  { key: "Thu", label: "Thu" },
+  { key: "Fri", label: "Fri" },
+  { key: "Sat", label: "Sat" },
+];
+const WEEKDAY_BY_INDEX = WEEKDAYS.map((d) => d.key); // JS getDay(): 0 = Sun ... 6 = Sat
+
+export function weekdayKeyForDate(date) {
+  return WEEKDAY_BY_INDEX[date.getDay()];
+}
+
+export function todayIsoDate(offsetDays = 0) {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  d.setHours(0, 0, 0, 0);
+  return d.toISOString().slice(0, 10);
+}
+
+// Fields aligned to the Ghana Education Service Standards-Based Curriculum
+// lesson note format.
+export const DETAIL_META = [
+  { key: "strand", label: "Strand" },
+  { key: "subStrand", label: "Sub-strand" },
+  { key: "contentStandard", label: "Content standard" },
+  { key: "indicator", label: "Indicator (learning outcome)" },
+  { key: "coreCompetencies", label: "Core competencies" },
+  { key: "keywords", label: "Keywords" },
+  { key: "teachingResources", label: "Teaching / learning resources" },
 ];
 
-export const AI_BANK = {
-  objectives: (l) => `By the end of the lesson, learners will be able to explain ${l.topic.toLowerCase()} in their own words and apply it to at least two practice problems.`,
-  intro: (l) => `Open with a quick real-life example connected to ${l.topic.toLowerCase()}. Ask learners what they already know, and note responses on the board.`,
-  teachingPoints: (l) => `1) Define the key idea behind ${l.topic.toLowerCase()}.\n2) Work through one worked example on the board.\n3) Highlight the common mistake learners make with this topic.`,
-  activity: (l) => `Pair learners up. Each pair solves one short problem on ${l.topic.toLowerCase()} on a shared sheet, then swaps with another pair to check work.`,
-  practice: (l) => `Give 3 individual practice questions of increasing difficulty on ${l.topic.toLowerCase()} for learners to complete in class.`,
-  assessment: (l) => `Exit ticket: one question on ${l.topic.toLowerCase()} that learners answer on a slip of paper before leaving.`,
-  homework: (l) => `Two practice questions on ${l.topic.toLowerCase()} plus one that asks learners to find a real-world example.`,
-  materials: (l) => `Whiteboard, exercise books, ${l.subject === "Integrated Science" ? "diagram handout" : "ruler and pencil"}.`,
-  notes: () => `Keep pace flexible — slow down on the worked example if learners look unsure before moving to independent practice.`,
-};
+export const PHASE_META = [
+  { key: "starterActivity", label: "Starter activity", icon: <Sunrise size={16} /> },
+  { key: "mainActivity", label: "Main / new learning", icon: <BookOpen size={16} /> },
+  { key: "plenary", label: "Plenary, reflection & assessment", icon: <ShieldCheck size={16} /> },
+  { key: "homework", label: "Homework", icon: <FileText size={16} /> },
+];
 
-export const QUICK_BANK = {
-  teachingPoints: (l) => `Quick version: state the key idea on ${l.topic.toLowerCase()} in one sentence, do one example, then send learners straight to practice.`,
-  activity: () => `Skip group work today — go straight from example to individual practice to save time.`,
-  homework: (l) => `One question on ${l.topic.toLowerCase()} to reinforce today's lesson.`,
-};
+export const ALL_FIELDS = [...DETAIL_META, ...PHASE_META];
 
 export function emptySections() {
-  return { objectives: "", intro: "", teachingPoints: "", activity: "", practice: "", assessment: "", homework: "", materials: "", notes: "" };
+  const obj = {};
+  ALL_FIELDS.forEach((f) => { obj[f.key] = ""; });
+  return obj;
 }
 
 export function computeProgress(sections) {
-  const total = SECTION_META.length;
-  const filled = SECTION_META.filter((s) => sections[s.key] && sections[s.key].trim().length > 0).length;
+  const total = ALL_FIELDS.length;
+  const filled = ALL_FIELDS.filter((f) => sections[f.key] && sections[f.key].trim().length > 0).length;
   return Math.round((filled / total) * 100);
 }
 
@@ -49,13 +62,81 @@ export function statusFromPct(pct) {
   return "none";
 }
 
-export function createLesson({ subject, className, topic, duration }) {
+// Offline fallback drafts — used only if a live AI request fails.
+export const AI_BANK = {
+  strand: (l) => `Strand relevant to "${l.topic}" — check this against your syllabus for the exact strand name.`,
+  subStrand: (l) => `Sub-strand covering "${l.topic}".`,
+  contentStandard: (l) => `Learners demonstrate understanding of ${l.topic.toLowerCase()} — check the exact content standard code in the syllabus.`,
+  indicator: (l) => `By the end of the lesson, the learner will be able to explain and apply ${l.topic.toLowerCase()}.`,
+  coreCompetencies: () => `Critical Thinking and Problem Solving; Communication and Collaboration.`,
+  keywords: (l) => `${l.topic}`,
+  teachingResources: (l) => `Textbook, whiteboard, exercise books${l.subject === "Integrated Science" ? ", diagram handout" : ""}.`,
+  starterActivity: (l) => `Briefly review the previous lesson, then introduce "${l.topic}" with a short question or real-life example to spark interest.`,
+  mainActivity: (l) => `Explain the key idea behind ${l.topic.toLowerCase()}, work through one example together, then have learners practice in pairs or small groups while you circulate and support.`,
+  plenary: (l) => `Ask a few learners to summarise what was learned about ${l.topic.toLowerCase()}. Give a short oral or written question to check understanding and address any misconceptions.`,
+  homework: (l) => `1-2 practice questions on ${l.topic.toLowerCase()} to consolidate the lesson.`,
+};
+
+export const QUICK_BANK = {
+  mainActivity: (l) => `Quick version: state the key idea on ${l.topic.toLowerCase()} in one or two sentences, do one example, then move straight to independent practice.`,
+  plenary: () => `One quick question to check understanding before ending the lesson.`,
+  homework: (l) => `One question on ${l.topic.toLowerCase()} to reinforce today's lesson.`,
+};
+
+export function createCourse({ subject, className, duration, days }) {
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     subject: (subject || "").trim(),
     className: (className || "").trim(),
-    topic: (topic || "").trim(),
     duration: (duration || "").trim() || "40 min",
-    sections: emptySections(),
+    days: Array.isArray(days) && days.length ? days : ["Mon", "Tue", "Wed", "Thu", "Fri"],
+    schemeOfWork: [],
+  };
+}
+
+export function createSowWeek({ term, week, topic, strand, subStrand, contentStandard, indicator }) {
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    term: term || 1,
+    week: week || 1,
+    topic: (topic || "").trim(),
+    strand: (strand || "").trim(),
+    subStrand: (subStrand || "").trim(),
+    contentStandard: (contentStandard || "").trim(),
+    indicator: (indicator || "").trim(),
+  };
+}
+
+// Simple day-count week number within whichever term is currently selected.
+export function computeWeekNumber(dateStr, termStartDateStr) {
+  if (!termStartDateStr) return null;
+  const date = new Date(`${dateStr}T00:00:00`);
+  const start = new Date(`${termStartDateStr}T00:00:00`);
+  const diffDays = Math.floor((date - start) / (1000 * 60 * 60 * 24));
+  if (diffDays < 0) return null;
+  return Math.floor(diffDays / 7) + 1;
+}
+
+export function findSowEntry(course, term, week) {
+  if (!course) return null;
+  return course.schemeOfWork.find((w) => w.term === term && w.week === week) || null;
+}
+
+export function createLessonInstance(course, dateStr, sowEntry) {
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    courseId: course.id,
+    date: dateStr,
+    subject: course.subject,
+    className: course.className,
+    duration: course.duration,
+    topic: sowEntry?.topic || "",
+    sections: {
+      ...emptySections(),
+      strand: sowEntry?.strand || "",
+      subStrand: sowEntry?.subStrand || "",
+      contentStandard: sowEntry?.contentStandard || "",
+      indicator: sowEntry?.indicator || "",
+    },
   };
 }
