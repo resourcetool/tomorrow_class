@@ -8,7 +8,7 @@ import ManageCoursesModal from "./components/ManageCoursesModal";
 import SchemeOfWorkModal from "./components/SchemeOfWorkModal";
 import HelpModal from "./components/HelpModal";
 import { Toast } from "./components/Shared";
-import { createCourse, createLessonInstance, computeWeekNumber, findSowEntry, weekdayKeyForDate, todayIsoDate } from "./lib/data";
+import { createCourse, createLessonInstance, computeWeekNumber, findSowEntry, nextNDates, formatDayLabel, formatShortDayLabel } from "./lib/data";
 import {
   loadCourses, saveCourses, loadInstances, saveInstances,
   loadApiKey, saveApiKey, loadTermStart, saveTermStart, loadCurrentTerm, saveCurrentTerm,
@@ -52,32 +52,44 @@ export default function App() {
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
 
-  const tomorrowDate = useMemo(() => todayIsoDate(1), []);
-  const tomorrowWeekday = useMemo(() => weekdayKeyForDate(new Date(Date.now() + 86400000)), []);
+  const PLAN_AHEAD_DAYS = 7;
+  const horizon = useMemo(() => nextNDates(PLAN_AHEAD_DAYS), []);
 
-  // Auto-create a lesson instance for tomorrow for every course scheduled
-  // that weekday, pre-filled from the Scheme of Work if a matching week
-  // exists for the currently selected term.
+  // Auto-create a lesson instance for every course scheduled on each of the
+  // next 7 days (not just tomorrow), pre-filled from the Scheme of Work if
+  // a matching week exists — so a class can be prepared ahead of time, on
+  // whichever day the teacher actually has time for it.
   useEffect(() => {
-    const missing = courses.filter(
-      (c) => c.days.includes(tomorrowWeekday) && !lessonInstances.some((li) => li.courseId === c.id && li.date === tomorrowDate)
-    );
-    if (missing.length === 0) return;
-    setLessonInstances((prev) => {
-      const additions = missing.map((c) => {
-        const week = computeWeekNumber(tomorrowDate, termStartDate) || 1;
+    const additions = [];
+    horizon.forEach(({ date, weekday }) => {
+      courses.forEach((c) => {
+        if (!c.days.includes(weekday)) return;
+        const exists = lessonInstances.some((li) => li.courseId === c.id && li.date === date);
+        if (exists) return;
+        const week = computeWeekNumber(date, termStartDate) || 1;
         const sowEntry = findSowEntry(c, currentTerm, week);
-        const instance = createLessonInstance(c, tomorrowDate, sowEntry);
+        const instance = createLessonInstance(c, date, sowEntry);
         instance.term = currentTerm;
         instance.week = week;
-        return instance;
+        additions.push(instance);
       });
-      return [...prev, ...additions];
     });
+    if (additions.length > 0) {
+      setLessonInstances((prev) => [...prev, ...additions]);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [courses, tomorrowDate, tomorrowWeekday]);
+  }, [courses, horizon]);
 
-  const tomorrowInstances = lessonInstances.filter((li) => li.date === tomorrowDate);
+  // Day 0 is always shown (even empty, for the "no classes tomorrow" state);
+  // later days are included only once they actually have a class scheduled.
+  const upcomingDays = horizon
+    .map(({ date }) => ({
+      date,
+      label: formatDayLabel(date),
+      shortLabel: formatShortDayLabel(date),
+      instances: lessonInstances.filter((li) => li.date === date),
+    }))
+    .filter((day, i) => i === 0 || day.instances.length > 0);
 
   function showToast(msg) { setToast(msg); }
 
@@ -148,7 +160,7 @@ export default function App() {
       ) : (
         <AppShell
           courses={courses}
-          tomorrowInstances={tomorrowInstances}
+          upcomingDays={upcomingDays}
           setLessonInstances={setLessonInstances}
           onToast={showToast}
           apiKey={apiKey}
