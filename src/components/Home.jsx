@@ -1,18 +1,17 @@
-import React, { useMemo } from "react";
+import React from "react";
 import { ChevronRight, HelpCircle, Settings as SettingsIcon, LayoutList } from "lucide-react";
 import { ReadinessRing, StatusText } from "./Shared";
 import { computeProgress, statusFromPct } from "../lib/data";
 
-export default function Home({ courses, tomorrowInstances, onOpenLesson, installBanner, onAddCourse, onManageCourses, onShowHelp, onOpenSettings }) {
+export default function Home({ courses, upcomingDays, onOpenLesson, installBanner, onAddCourse, onManageCourses, onShowHelp, onOpenSettings }) {
+  const heroDay = upcomingDays[0];
+  const laterDays = upcomingDays.slice(1);
+  const tomorrowInstances = heroDay ? heroDay.instances : [];
+
   const overall = tomorrowInstances.length
     ? Math.round(tomorrowInstances.reduce((a, l) => a + computeProgress(l.sections), 0) / tomorrowInstances.length)
     : 0;
   const notReady = tomorrowInstances.filter((l) => computeProgress(l.sections) < 100).length;
-  const tomorrow = useMemo(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 1);
-    return d.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
-  }, []);
   const hasCourses = courses.length > 0;
 
   return (
@@ -22,7 +21,7 @@ export default function Home({ courses, tomorrowInstances, onOpenLesson, install
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
           <div>
             <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-muted)", marginBottom: 2 }}>Tomorrow</div>
-            <h1 style={{ fontSize: 21, fontWeight: 700, margin: "0 0 4px" }}>{tomorrow}</h1>
+            <h1 style={{ fontSize: 21, fontWeight: 700, margin: "0 0 4px" }}>{heroDay ? heroDay.label : ""}</h1>
             <div style={{ fontSize: 13.5, color: "var(--text-muted)" }}>
               {tomorrowInstances.length === 0
                 ? (hasCourses ? "No classes scheduled tomorrow" : "No classes added yet")
@@ -50,7 +49,8 @@ export default function Home({ courses, tomorrowInstances, onOpenLesson, install
               <>
                 <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 6 }}>No classes tomorrow</div>
                 <div style={{ fontSize: 13.5, color: "var(--text-muted)", lineHeight: 1.5 }}>
-                  None of your classes are scheduled to run tomorrow. Check "My classes" if that doesn't look right.
+                  None of your classes are scheduled to run tomorrow. Check "My classes" if that doesn't look right,
+                  or look below for classes coming up later this week.
                 </div>
               </>
             ) : (
@@ -83,6 +83,34 @@ export default function Home({ courses, tomorrowInstances, onOpenLesson, install
           </div>
         )}
       </div>
+
+      {laterDays.length > 0 && (
+        <div style={{ padding: "22px 20px 24px" }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: "var(--text-muted)", marginBottom: 10, textTransform: "uppercase", letterSpacing: 0.3 }}>
+            Coming up — prepare ahead any time
+          </div>
+          {laterDays.map((day) => (
+            <div key={day.date} style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--text-muted)", margin: "0 0 6px 2px" }}>{day.shortLabel}</div>
+              <div className="tc-card">
+                {day.instances.map((l) => {
+                  const pct = computeProgress(l.sections);
+                  return (
+                    <button key={l.id} className="tc-list-row" onClick={() => onOpenLesson(l.id)}>
+                      <ReadinessRing pct={pct} size={32} stroke={3} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: 14 }}>{l.subject}</div>
+                        <div style={{ fontSize: 12.5, color: "var(--text-muted)" }}>{l.className}{l.topic ? ` · ${l.topic}` : ""}</div>
+                      </div>
+                      <ChevronRight size={16} color="var(--text-muted)" style={{ flexShrink: 0 }} />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

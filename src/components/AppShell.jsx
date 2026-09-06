@@ -6,12 +6,13 @@ import Tools from "./Tools";
 import Premium from "./Premium";
 
 export default function AppShell({
-  courses, tomorrowInstances, setLessonInstances, onToast, apiKey, onOpenSettings, installBanner,
+  courses, upcomingDays, setLessonInstances, onToast, apiKey, onOpenSettings, installBanner,
   onAddCourse, onManageCourses, onShowHelp,
 }) {
   const [tab, setTab] = useState("home");
   const [openInstanceId, setOpenInstanceId] = useState(null);
-  const openInstance = tomorrowInstances.find((l) => l.id === openInstanceId);
+  const allInstances = upcomingDays.flatMap((d) => d.instances);
+  const openInstance = allInstances.find((l) => l.id === openInstanceId);
   const openCourse = openInstance ? courses.find((c) => c.id === openInstance.courseId) : null;
 
   function updateInstance(next) {
@@ -35,7 +36,7 @@ export default function AppShell({
     content = (
       <Home
         courses={courses}
-        tomorrowInstances={tomorrowInstances}
+        upcomingDays={upcomingDays}
         onOpenLesson={setOpenInstanceId}
         installBanner={installBanner}
         onAddCourse={onAddCourse}

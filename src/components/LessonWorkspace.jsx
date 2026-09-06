@@ -118,7 +118,7 @@ export default function LessonWorkspace({ lesson, course, onChange, onBack, onTo
     <div className="tc-fade-in" style={{ maxWidth: 640, margin: "0 auto", paddingBottom: 40 }}>
       <div style={{ position: "sticky", top: 0, background: "var(--bg-muted)", zIndex: 20, padding: "18px 20px 14px" }}>
         <button className="tc-btn-text" onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 14 }}>
-          <ChevronLeft size={16} /> Tomorrow
+          <ChevronLeft size={16} /> Back
         </button>
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
