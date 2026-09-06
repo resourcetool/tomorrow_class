@@ -5,17 +5,17 @@ export default function SettingsModal({ apiKey, onSave, onClose }) {
   const [draft, setDraft] = useState(apiKey || "");
   return (
     <div
-      style={{ position: "fixed", inset: 0, background: "rgba(27,35,64,0.55)", zIndex: 300, display: "flex", alignItems: "flex-end", justifyContent: "center" }}
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", zIndex: 300, display: "flex", alignItems: "flex-end", justifyContent: "center" }}
       onClick={onClose}
     >
-      <div className="tc-card tc-pop" style={{ width: "100%", maxWidth: 480, padding: 24, borderRadius: "20px 20px 0 0", margin: 0 }} onClick={(e) => e.stopPropagation()}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+      <div className="tc-card" style={{ width: "100%", maxWidth: 480, padding: 22, borderRadius: "16px 16px 0 0", margin: 0 }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
           <KeyRound size={18} />
           <div style={{ fontWeight: 700, fontSize: 16 }}>Connect AI</div>
         </div>
-        <p style={{ fontSize: 13, color: "var(--slate-soft)", lineHeight: 1.55, marginBottom: 14 }}>
-          Paste a Groq API key to enable real AI lesson preparation. It's kept in memory for this session only —
-          never saved to disk, storage, or sent anywhere except Groq's API.
+        <p style={{ fontSize: 13, color: "var(--text-muted)", lineHeight: 1.55, marginBottom: 14 }}>
+          Paste a Groq API key to enable real AI lesson preparation. It's saved only in this browser's local
+          storage, on this device — never sent anywhere except Groq's API, and never bundled into the app's code.
         </p>
         <input
           type="password"

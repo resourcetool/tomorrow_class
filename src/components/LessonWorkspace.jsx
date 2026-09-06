@@ -39,7 +39,7 @@ export default function LessonWorkspace({ lesson, onChange, onBack, onToast, api
       const filled = {};
       SECTION_META.forEach((s) => { filled[s.key] = AI_BANK[s.key](lesson); });
       onChange({ ...lesson, sections: filled });
-      onToast("Couldn't reach AI — used a local draft");
+      onToast(err?.message ? `${err.message.slice(0, 80)} — used a local draft instead` : "Couldn't reach AI — used a local draft instead");
     } finally {
       setGenerating(false);
     }
@@ -59,7 +59,7 @@ export default function LessonWorkspace({ lesson, onChange, onBack, onToast, api
       quickFields.forEach((k) => { next[k] = QUICK_BANK[k] ? QUICK_BANK[k](lesson) : AI_BANK[k](lesson); });
       if (!next.objectives) next.objectives = AI_BANK.objectives(lesson);
       onChange({ ...lesson, sections: next });
-      onToast("Couldn't reach AI — used a local draft");
+      onToast(err?.message ? `${err.message.slice(0, 80)} — used a local draft instead` : "Couldn't reach AI — used a local draft instead");
     } finally {
       setGenerating(false);
     }
@@ -85,7 +85,7 @@ export default function LessonWorkspace({ lesson, onChange, onBack, onToast, api
       setRefineDrafts((d) => ({ ...d, [sectionKey]: "" }));
     } catch (err) {
       console.error(err);
-      onToast("Couldn't reach AI to refine this section");
+      onToast(err?.message ? err.message.slice(0, 100) : "Couldn't reach AI to refine this section");
     } finally {
       setRefiningKey(null);
     }

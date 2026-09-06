@@ -31,7 +31,7 @@ export default function Premium({ onToast }) {
       </div>
 
       <div style={{ padding: "0 20px" }}>
-        <button className="tc-btn tc-btn-primary" style={{ width: "100%" }} onClick={() => onToast("This is a demo — no real payment will be made")}>
+        <button className="tc-btn tc-btn-primary" style={{ width: "100%" }} onClick={() => onToast("Payment isn't set up yet — check back soon")}>
           Upgrade to Premium
         </button>
       </div>

@@ -5,7 +5,10 @@ import LessonWorkspace from "./LessonWorkspace";
 import Tools from "./Tools";
 import Premium from "./Premium";
 
-export default function AppShell({ lessons, setLessons, onToast, apiKey, onOpenSettings, installBanner }) {
+export default function AppShell({
+  lessons, setLessons, onToast, apiKey, onOpenSettings, installBanner,
+  onAddLesson, onEditLesson, onShowHelp,
+}) {
   const [tab, setTab] = useState("home");
   const [openLessonId, setOpenLessonId] = useState(null);
   const openLesson = lessons.find((l) => l.id === openLessonId);
@@ -27,9 +30,18 @@ export default function AppShell({ lessons, setLessons, onToast, apiKey, onOpenS
       />
     );
   } else if (tab === "home") {
-    content = <Home lessons={lessons} onOpenLesson={setOpenLessonId} installBanner={installBanner} />;
+    content = (
+      <Home
+        lessons={lessons}
+        onOpenLesson={setOpenLessonId}
+        installBanner={installBanner}
+        onAddLesson={onAddLesson}
+        onEditLesson={onEditLesson}
+        onShowHelp={onShowHelp}
+      />
+    );
   } else if (tab === "tools") {
-    content = <Tools onToast={onToast} />;
+    content = <Tools onToast={onToast} onGoHome={() => setTab("home")} />;
   } else {
     content = <Premium onToast={onToast} />;
   }
