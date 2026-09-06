@@ -23,6 +23,28 @@ export function todayIsoDate(offsetDays = 0) {
   return d.toISOString().slice(0, 10);
 }
 
+// The next N days (starting tomorrow), each with its ISO date and weekday key.
+export function nextNDates(n) {
+  const days = [];
+  for (let i = 1; i <= n; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() + i);
+    d.setHours(0, 0, 0, 0);
+    days.push({ date: d.toISOString().slice(0, 10), weekday: weekdayKeyForDate(d) });
+  }
+  return days;
+}
+
+export function formatDayLabel(dateStr) {
+  const d = new Date(`${dateStr}T00:00:00`);
+  return d.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+}
+
+export function formatShortDayLabel(dateStr) {
+  const d = new Date(`${dateStr}T00:00:00`);
+  return d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+}
+
 // Fields aligned to the Ghana Education Service Standards-Based Curriculum
 // lesson note format.
 export const DETAIL_META = [
