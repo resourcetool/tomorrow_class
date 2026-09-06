@@ -42,13 +42,13 @@ export default function App() {
 
   const installBanner = deferredPrompt && !dismissedInstall ? (
     <div className="tc-install-banner">
-      <Download size={18} color="#E8A659" style={{ flexShrink: 0 }} />
-      <div style={{ flex: 1, fontSize: 13.5 }}>Install Tomorrow's Class for one-tap access, even offline.</div>
-      <button className="tc-btn tc-btn-dawn tc-btn-sm" onClick={handleInstall}>Install</button>
+      <Download size={18} color="var(--primary)" style={{ flexShrink: 0 }} />
+      <div style={{ flex: 1, fontSize: 13.5, color: "var(--text)" }}>Install for one-tap access, even offline.</div>
+      <button className="tc-btn tc-btn-primary tc-btn-sm" onClick={handleInstall}>Install</button>
       <button
         aria-label="Dismiss"
         onClick={() => setDismissedInstall(true)}
-        style={{ background: "none", border: "none", color: "#C7CCE3", cursor: "pointer", padding: 4 }}
+        style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: 4 }}
       >
         <X size={16} />
       </button>
