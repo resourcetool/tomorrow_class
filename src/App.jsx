@@ -3,23 +3,33 @@ import { Download, X } from "lucide-react";
 import Landing from "./components/Landing";
 import AppShell from "./components/AppShell";
 import SettingsModal from "./components/SettingsModal";
+import LessonFormModal from "./components/LessonFormModal";
+import HelpModal from "./components/HelpModal";
 import { Toast } from "./components/Shared";
-import { INITIAL_LESSONS } from "./lib/data";
+import { createLesson } from "./lib/data";
+import { loadLessons, saveLessons, loadApiKey, saveApiKey } from "./lib/storage";
 import { BUILD_TIME_API_KEY } from "./lib/groq";
 
-export default function App() {
-  const [screen, setScreen] = useState("landing");
-  const [lessons, setLessons] = useState(INITIAL_LESSONS);
-  const [toast, setToast] = useState(null);
-  const [apiKey, setApiKey] = useState(BUILD_TIME_API_KEY);
-  const [showSettings, setShowSettings] = useState(false);
+const SEEN_INTRO_KEY = "tc_seen_intro";
 
-  // Standard PWA "Add to Home Screen" flow: the browser fires this event
-  // when the app meets installability criteria (manifest + service worker
-  // + served over HTTPS). We stash the event and trigger it from our own
-  // banner instead of the browser's default mini-infobar.
+export default function App() {
+  // Skip the welcome screen after the very first visit — a returning
+  // teacher should land straight on tomorrow's lessons, not a splash page.
+  const [screen, setScreen] = useState(() => {
+    try { return localStorage.getItem(SEEN_INTRO_KEY) === "true" ? "app" : "landing"; }
+    catch { return "landing"; }
+  });
+
+  const [lessons, setLessons] = useState(() => loadLessons() || []);
+  const [toast, setToast] = useState(null);
+  const [apiKey, setApiKey] = useState(() => loadApiKey() || BUILD_TIME_API_KEY);
+  const [showSettings, setShowSettings] = useState(false);
+  const [lessonForm, setLessonForm] = useState(null); // null | { mode: "add" } | { mode: "edit", lesson }
+  const [showHelp, setShowHelp] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [dismissedInstall, setDismissedInstall] = useState(false);
+
+  useEffect(() => { saveLessons(lessons); }, [lessons]);
 
   useEffect(() => {
     function handler(e) {
@@ -32,12 +42,34 @@ export default function App() {
 
   function showToast(msg) { setToast(msg); }
 
+  function handleStart() {
+    try { localStorage.setItem(SEEN_INTRO_KEY, "true"); } catch { /* ignore */ }
+    setScreen("app");
+  }
+
   async function handleInstall() {
     if (!deferredPrompt) return;
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === "accepted") showToast("Installing Tomorrow's Class…");
+    if (outcome === "accepted") showToast("Installing…");
     setDeferredPrompt(null);
+  }
+
+  function handleSaveLesson(fields) {
+    if (lessonForm?.mode === "edit") {
+      setLessons((prev) => prev.map((l) => (l.id === lessonForm.lesson.id ? { ...l, ...fields } : l)));
+      showToast("Lesson updated");
+    } else {
+      setLessons((prev) => [...prev, createLesson(fields)]);
+      showToast("Lesson added");
+    }
+    setLessonForm(null);
+  }
+
+  function handleDeleteLesson(id) {
+    setLessons((prev) => prev.filter((l) => l.id !== id));
+    setLessonForm(null);
+    showToast("Lesson deleted");
   }
 
   const installBanner = deferredPrompt && !dismissedInstall ? (
@@ -58,7 +90,7 @@ export default function App() {
   return (
     <>
       {screen === "landing" ? (
-        <Landing onStart={() => setScreen("app")} />
+        <Landing onStart={handleStart} />
       ) : (
         <AppShell
           lessons={lessons}
@@ -67,16 +99,32 @@ export default function App() {
           apiKey={apiKey}
           onOpenSettings={() => setShowSettings(true)}
           installBanner={installBanner}
+          onAddLesson={() => setLessonForm({ mode: "add" })}
+          onEditLesson={(lesson) => setLessonForm({ mode: "edit", lesson })}
+          onShowHelp={() => setShowHelp(true)}
         />
       )}
       {toast && <Toast message={toast} onDone={() => setToast(null)} />}
       {showSettings && (
         <SettingsModal
           apiKey={apiKey}
-          onSave={(key) => { setApiKey(key); showToast(key ? "AI connected" : "AI key cleared"); }}
+          onSave={(key) => {
+            setApiKey(key);
+            saveApiKey(key);
+            showToast(key ? "AI connected" : "AI key cleared");
+          }}
           onClose={() => setShowSettings(false)}
         />
       )}
+      {lessonForm && (
+        <LessonFormModal
+          lesson={lessonForm.mode === "edit" ? lessonForm.lesson : null}
+          onSave={handleSaveLesson}
+          onDelete={handleDeleteLesson}
+          onClose={() => setLessonForm(null)}
+        />
+      )}
+      {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
     </>
   );
 }
