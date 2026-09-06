@@ -6,24 +6,26 @@ import Tools from "./Tools";
 import Premium from "./Premium";
 
 export default function AppShell({
-  lessons, setLessons, onToast, apiKey, onOpenSettings, installBanner,
-  onAddLesson, onEditLesson, onShowHelp,
+  courses, tomorrowInstances, setLessonInstances, onToast, apiKey, onOpenSettings, installBanner,
+  onAddCourse, onManageCourses, onShowHelp,
 }) {
   const [tab, setTab] = useState("home");
-  const [openLessonId, setOpenLessonId] = useState(null);
-  const openLesson = lessons.find((l) => l.id === openLessonId);
+  const [openInstanceId, setOpenInstanceId] = useState(null);
+  const openInstance = tomorrowInstances.find((l) => l.id === openInstanceId);
+  const openCourse = openInstance ? courses.find((c) => c.id === openInstance.courseId) : null;
 
-  function updateLesson(next) {
-    setLessons((prev) => prev.map((l) => (l.id === next.id ? next : l)));
+  function updateInstance(next) {
+    setLessonInstances((prev) => prev.map((l) => (l.id === next.id ? next : l)));
   }
 
   let content;
-  if (openLesson) {
+  if (openInstance) {
     content = (
       <LessonWorkspace
-        lesson={openLesson}
-        onChange={updateLesson}
-        onBack={() => setOpenLessonId(null)}
+        lesson={openInstance}
+        course={openCourse}
+        onChange={updateInstance}
+        onBack={() => setOpenInstanceId(null)}
         onToast={onToast}
         apiKey={apiKey}
         onOpenSettings={onOpenSettings}
@@ -32,12 +34,14 @@ export default function AppShell({
   } else if (tab === "home") {
     content = (
       <Home
-        lessons={lessons}
-        onOpenLesson={setOpenLessonId}
+        courses={courses}
+        tomorrowInstances={tomorrowInstances}
+        onOpenLesson={setOpenInstanceId}
         installBanner={installBanner}
-        onAddLesson={onAddLesson}
-        onEditLesson={onEditLesson}
+        onAddCourse={onAddCourse}
+        onManageCourses={onManageCourses}
         onShowHelp={onShowHelp}
+        onOpenSettings={onOpenSettings}
       />
     );
   } else if (tab === "tools") {
@@ -50,13 +54,13 @@ export default function AppShell({
     <div style={{ minHeight: "100vh", paddingBottom: 70, background: "var(--bg-muted)" }}>
       {content}
       <nav style={{ position: "fixed", bottom: 0, left: 0, right: 0, background: "#fff", borderTop: "1px solid var(--border)", display: "flex", padding: "8px 10px calc(8px + env(safe-area-inset-bottom))", zIndex: 30 }}>
-        <button className={`tc-nav-item ${tab === "home" && !openLesson ? "active" : ""}`} onClick={() => { setTab("home"); setOpenLessonId(null); }}>
+        <button className={`tc-nav-item ${tab === "home" && !openInstance ? "active" : ""}`} onClick={() => { setTab("home"); setOpenInstanceId(null); }}>
           <HomeIcon size={20} /> Tomorrow
         </button>
-        <button className={`tc-nav-item ${tab === "tools" && !openLesson ? "active" : ""}`} onClick={() => { setTab("tools"); setOpenLessonId(null); }}>
+        <button className={`tc-nav-item ${tab === "tools" && !openInstance ? "active" : ""}`} onClick={() => { setTab("tools"); setOpenInstanceId(null); }}>
           <Wrench size={20} /> Tools
         </button>
-        <button className={`tc-nav-item ${tab === "premium" && !openLesson ? "active" : ""}`} onClick={() => { setTab("premium"); setOpenLessonId(null); }}>
+        <button className={`tc-nav-item ${tab === "premium" && !openInstance ? "active" : ""}`} onClick={() => { setTab("premium"); setOpenInstanceId(null); }}>
           <Star size={20} /> Premium
         </button>
       </nav>

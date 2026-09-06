@@ -2,11 +2,12 @@ import React from "react";
 import { X } from "lucide-react";
 
 const STEPS = [
-  { t: "Add your classes", d: "Tap + on the Tomorrow screen and add each class you teach — one subject, two, or a full timetable. There's no fixed number." },
-  { t: "Prepare a lesson", d: 'Open a lesson and tap "Prepare with AI" for a full draft, or "10 min" when you\'re short on time.' },
-  { t: "Refine anything", d: 'Edit a section directly, or type an instruction into "Ask AI to adjust this" to rewrite just that part.' },
-  { t: "Connect AI once", d: "The first time you use AI prep, you'll be asked for a Groq API key. It's saved only in this browser, on this device." },
-  { t: "Track readiness", d: "The ring on each lesson fills in as sections are completed — 100% means that lesson is ready for tomorrow." },
+  { t: "Add your classes", d: "Tap \"My classes\" and add each one — choose exactly which days it runs, whether that's every day or just Monday, Wednesday and Friday." },
+  { t: "Set your term (optional)", d: "In Settings, pick the current term and the date it started. This lets the app work out which week of your Scheme of Work tomorrow falls in." },
+  { t: "Add a Scheme of Work (optional)", d: "Edit a class and tap \"Manage Scheme of Work\" to list each week's topic for the term. Tomorrow's lesson picks up its topic automatically." },
+  { t: "Prepare a lesson", d: "Open a lesson and tap \"Prepare with AI\" for a full, GES-aligned draft, or \"10 min\" when you're short on time." },
+  { t: "Refine anything", d: "Edit a field directly, or type an instruction into \"Ask AI to adjust this\" to rewrite just that part." },
+  { t: "Back it up", d: "Your classes and lessons live only on this device. Download a backup from Settings now and then so you never lose them." },
 ];
 
 export default function HelpModal({ onClose }) {
