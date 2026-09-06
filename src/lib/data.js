@@ -49,17 +49,13 @@ export function statusFromPct(pct) {
   return "none";
 }
 
-export const INITIAL_LESSONS = [
-  {
-    id: 1, subject: "Mathematics", className: "JHS 2", topic: "Simplifying Algebraic Fractions", duration: "40 min",
-    sections: { ...emptySections(), objectives: "Learners will simplify algebraic fractions by finding common factors." },
-  },
-  {
-    id: 2, subject: "English Language", className: "JHS 2", topic: "Comprehension: Making Inferences", duration: "40 min",
+export function createLesson({ subject, className, topic, duration }) {
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    subject: (subject || "").trim(),
+    className: (className || "").trim(),
+    topic: (topic || "").trim(),
+    duration: (duration || "").trim() || "40 min",
     sections: emptySections(),
-  },
-  {
-    id: 3, subject: "Integrated Science", className: "JHS 1", topic: "States of Matter", duration: "35 min",
-    sections: emptySections(),
-  },
-];
+  };
+}

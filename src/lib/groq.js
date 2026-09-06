@@ -1,17 +1,18 @@
 import { SECTION_META } from "./data";
 
-export const GROQ_MODEL = "llama-3.3-70b-versatile";
+// Groq renames/retires model names fairly often. Trying a short candidate
+// list in order (falling through only on "model unavailable"-type errors)
+// makes generation resilient to any single model name going stale, instead
+// of hard-failing the whole app on one hardcoded string.
+const MODEL_CANDIDATES = ["llama-3.1-8b-instant", "llama-3.3-70b-versatile", "llama-3.1-70b-versatile"];
+export const GROQ_MODEL = MODEL_CANDIDATES[0];
 
-// If REACT_APP_GROQ_API_KEY was set at build time it will end up in the
-// public JS bundle, readable by anyone (see .env.example for why). It's
-// offered here only as a local-dev convenience default; the in-app
-// "Connect AI" settings panel is the safer path for anything deployed.
+// If REACT_APP_GROQ_API_KEY was set at build time it ends up in the public
+// JS bundle (see .env.example). Used only as a local-dev fallback default —
+// the in-app "Connect AI" panel (stored in this browser's localStorage,
+// per device) is the real path for anything deployed.
 export const BUILD_TIME_API_KEY = process.env.REACT_APP_GROQ_API_KEY || "";
 
-// A fixed identity + guardrail, sent as the system message on every call.
-// Keeping the assistant "in role" matters here because free-text user input
-// (the refine instruction below) does reach the model, unlike the lesson
-// subject/topic fields which the teacher controls themselves.
 export const SYSTEM_PROMPT = `You are the lesson-preparation assistant inside "Tomorrow's Class," an app that helps teachers prepare tomorrow's lessons. You help draft and refine lesson content: objectives, activities, practice, homework, and similar classroom material.
 
 Rules you always follow:
@@ -36,33 +37,68 @@ Respond with ONLY a raw JSON object (no markdown, no code fences) with exactly t
 Each value should be a short plain-text string (2-4 sentences, or a short numbered list using \\n between items where relevant). Do not include any other keys or commentary.`;
 }
 
-// Full / 10-minute generation: needs a single structured JSON object back,
-// so this stays a normal (non-streamed) request — streaming partial JSON
-// into several separate fields reliably isn't worth the complexity here.
-export async function callGroq(apiKey, lesson, mode) {
-  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: GROQ_MODEL,
-      messages: [
-        { role: "system", content: `${SYSTEM_PROMPT}\nFor this request, respond with only raw JSON, never markdown or commentary.` },
-        { role: "user", content: buildPrompt(lesson, mode) },
-      ],
-      temperature: 0.6,
-    }),
-  });
+async function requestOnce(apiKey, model, messages, { json = false, stream = false } = {}) {
+  const body = { model, messages, temperature: 0.6 };
+  if (json) body.response_format = { type: "json_object" };
+  if (stream) body.stream = true;
+
+  let response;
+  try {
+    response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify(body),
+    });
+  } catch (networkErr) {
+    throw new Error(`Network error reaching Groq — check your internet connection (${networkErr.message})`);
+  }
+
   if (!response.ok) {
     const errBody = await response.text().catch(() => "");
-    throw new Error(`Groq API error (${response.status}): ${errBody.slice(0, 200)}`);
+    let reason = errBody;
+    try { reason = JSON.parse(errBody)?.error?.message || errBody; } catch { /* not JSON */ }
+
+    if (response.status === 401) throw new Error("Groq rejected the API key — check the key in Connect AI");
+    if (response.status === 429) throw new Error("Groq rate limit reached — wait a moment and try again");
+    if (response.status === 404 || /decommission|does not exist|not found/i.test(reason)) {
+      const err = new Error(`Model unavailable: ${reason || response.status}`);
+      err.modelUnavailable = true;
+      throw err;
+    }
+    throw new Error(`Groq API error (${response.status}): ${String(reason).slice(0, 180)}`);
   }
-  const data = await response.json();
-  const text = data?.choices?.[0]?.message?.content || "";
-  const clean = text.replace(/```json/gi, "").replace(/```/g, "").trim();
-  return JSON.parse(clean);
+  return response;
+}
+
+// Full / 10-minute generation: needs one structured JSON object back, so
+// this stays a normal (non-streamed) request, tried across MODEL_CANDIDATES
+// until one responds successfully.
+export async function callGroq(apiKey, lesson, mode) {
+  if (!apiKey || !apiKey.trim()) throw new Error("No API key set yet");
+
+  const messages = [
+    { role: "system", content: `${SYSTEM_PROMPT}\nFor this request, respond with only raw JSON, never markdown or commentary.` },
+    { role: "user", content: buildPrompt(lesson, mode) },
+  ];
+
+  let lastErr;
+  for (const model of MODEL_CANDIDATES) {
+    try {
+      const response = await requestOnce(apiKey, model, messages, { json: true });
+      const data = await response.json();
+      const text = data?.choices?.[0]?.message?.content || "";
+      const clean = text.replace(/```json/gi, "").replace(/```/g, "").trim();
+      try {
+        return JSON.parse(clean);
+      } catch {
+        throw new Error("Groq returned a response that wasn't valid JSON — try again");
+      }
+    } catch (err) {
+      lastErr = err;
+      if (!err.modelUnavailable) break; // only fall through to the next model for availability errors
+    }
+  }
+  throw lastErr;
 }
 
 export function buildRefineMessages(lesson, sectionLabel, currentText, instruction) {
@@ -80,28 +116,11 @@ Respond with only the replacement text for this section — no heading, no quote
 }
 
 // Real token-by-token streaming (Groq's API is OpenAI-compatible SSE).
-// onDelta(delta, fullTextSoFar) fires for each chunk as it arrives, so a
-// caller can render live-typing text straight from the network stream
-// rather than faking a typewriter over an already-complete response.
+// onDelta(delta, fullTextSoFar) fires per chunk as it arrives.
 export async function streamGroq(apiKey, messages, onDelta) {
-  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: GROQ_MODEL,
-      messages,
-      temperature: 0.6,
-      stream: true,
-    }),
-  });
-  if (!response.ok || !response.body) {
-    const errBody = await response.text().catch(() => "");
-    throw new Error(`Groq API error (${response.status}): ${errBody.slice(0, 200)}`);
-  }
+  if (!apiKey || !apiKey.trim()) throw new Error("No API key set yet");
 
+  const response = await requestOnce(apiKey, GROQ_MODEL, messages, { stream: true });
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let full = "";
@@ -112,7 +131,7 @@ export async function streamGroq(apiKey, messages, onDelta) {
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
     const lines = buffer.split("\n");
-    buffer = lines.pop(); // keep the last (possibly incomplete) line for next chunk
+    buffer = lines.pop();
 
     for (const line of lines) {
       const trimmed = line.trim();
