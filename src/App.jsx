@@ -1,44 +1,83 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Download, X } from "lucide-react";
 import Landing from "./components/Landing";
 import AppShell from "./components/AppShell";
 import SettingsModal from "./components/SettingsModal";
 import LessonFormModal from "./components/LessonFormModal";
+import ManageCoursesModal from "./components/ManageCoursesModal";
+import SchemeOfWorkModal from "./components/SchemeOfWorkModal";
 import HelpModal from "./components/HelpModal";
 import { Toast } from "./components/Shared";
-import { createLesson } from "./lib/data";
-import { loadLessons, saveLessons, loadApiKey, saveApiKey } from "./lib/storage";
+import { createCourse, createLessonInstance, computeWeekNumber, findSowEntry, weekdayKeyForDate, todayIsoDate } from "./lib/data";
+import {
+  loadCourses, saveCourses, loadInstances, saveInstances,
+  loadApiKey, saveApiKey, loadTermStart, saveTermStart, loadCurrentTerm, saveCurrentTerm,
+  requestPersistentStorage, exportBackup,
+} from "./lib/storage";
 import { BUILD_TIME_API_KEY } from "./lib/groq";
 
 const SEEN_INTRO_KEY = "tc_seen_intro";
 
 export default function App() {
-  // Skip the welcome screen after the very first visit — a returning
-  // teacher should land straight on tomorrow's lessons, not a splash page.
+  // Skip the welcome screen after the very first visit.
   const [screen, setScreen] = useState(() => {
     try { return localStorage.getItem(SEEN_INTRO_KEY) === "true" ? "app" : "landing"; }
     catch { return "landing"; }
   });
 
-  const [lessons, setLessons] = useState(() => loadLessons() || []);
-  const [toast, setToast] = useState(null);
+  const [courses, setCourses] = useState(() => loadCourses() || []);
+  const [lessonInstances, setLessonInstances] = useState(() => loadInstances() || []);
   const [apiKey, setApiKey] = useState(() => loadApiKey() || BUILD_TIME_API_KEY);
+  const [termStartDate, setTermStartDate] = useState(() => loadTermStart());
+  const [currentTerm, setCurrentTerm] = useState(() => loadCurrentTerm());
+
+  const [toast, setToast] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
-  const [lessonForm, setLessonForm] = useState(null); // null | { mode: "add" } | { mode: "edit", lesson }
+  const [courseForm, setCourseForm] = useState(null); // null | { mode: "add" } | { mode: "edit", course }
+  const [manageCoursesOpen, setManageCoursesOpen] = useState(false);
+  const [sowCourse, setSowCourse] = useState(null);
   const [showHelp, setShowHelp] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [dismissedInstall, setDismissedInstall] = useState(false);
 
-  useEffect(() => { saveLessons(lessons); }, [lessons]);
+  useEffect(() => { requestPersistentStorage(); }, []);
+  useEffect(() => { saveCourses(courses); }, [courses]);
+  useEffect(() => { saveInstances(lessonInstances); }, [lessonInstances]);
+  useEffect(() => { saveTermStart(termStartDate); }, [termStartDate]);
+  useEffect(() => { saveCurrentTerm(currentTerm); }, [currentTerm]);
 
   useEffect(() => {
-    function handler(e) {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    }
+    function handler(e) { e.preventDefault(); setDeferredPrompt(e); }
     window.addEventListener("beforeinstallprompt", handler);
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
+
+  const tomorrowDate = useMemo(() => todayIsoDate(1), []);
+  const tomorrowWeekday = useMemo(() => weekdayKeyForDate(new Date(Date.now() + 86400000)), []);
+
+  // Auto-create a lesson instance for tomorrow for every course scheduled
+  // that weekday, pre-filled from the Scheme of Work if a matching week
+  // exists for the currently selected term.
+  useEffect(() => {
+    const missing = courses.filter(
+      (c) => c.days.includes(tomorrowWeekday) && !lessonInstances.some((li) => li.courseId === c.id && li.date === tomorrowDate)
+    );
+    if (missing.length === 0) return;
+    setLessonInstances((prev) => {
+      const additions = missing.map((c) => {
+        const week = computeWeekNumber(tomorrowDate, termStartDate) || 1;
+        const sowEntry = findSowEntry(c, currentTerm, week);
+        const instance = createLessonInstance(c, tomorrowDate, sowEntry);
+        instance.term = currentTerm;
+        instance.week = week;
+        return instance;
+      });
+      return [...prev, ...additions];
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [courses, tomorrowDate, tomorrowWeekday]);
+
+  const tomorrowInstances = lessonInstances.filter((li) => li.date === tomorrowDate);
 
   function showToast(msg) { setToast(msg); }
 
@@ -55,21 +94,36 @@ export default function App() {
     setDeferredPrompt(null);
   }
 
-  function handleSaveLesson(fields) {
-    if (lessonForm?.mode === "edit") {
-      setLessons((prev) => prev.map((l) => (l.id === lessonForm.lesson.id ? { ...l, ...fields } : l)));
-      showToast("Lesson updated");
+  function handleSaveCourse(fields) {
+    if (courseForm?.mode === "edit") {
+      setCourses((prev) => prev.map((c) => (c.id === courseForm.course.id ? { ...c, ...fields } : c)));
+      showToast("Class updated");
     } else {
-      setLessons((prev) => [...prev, createLesson(fields)]);
-      showToast("Lesson added");
+      setCourses((prev) => [...prev, createCourse(fields)]);
+      showToast("Class added");
     }
-    setLessonForm(null);
+    setCourseForm(null);
   }
 
-  function handleDeleteLesson(id) {
-    setLessons((prev) => prev.filter((l) => l.id !== id));
-    setLessonForm(null);
-    showToast("Lesson deleted");
+  function handleDeleteCourse(id) {
+    setCourses((prev) => prev.filter((c) => c.id !== id));
+    setLessonInstances((prev) => prev.filter((li) => li.courseId !== id));
+    setCourseForm(null);
+    setManageCoursesOpen(false);
+    showToast("Class deleted");
+  }
+
+  function handleSaveSow(updatedCourse) {
+    setCourses((prev) => prev.map((c) => (c.id === updatedCourse.id ? updatedCourse : c)));
+    showToast("Scheme of Work saved");
+  }
+
+  function handleImportBackup(data) {
+    setCourses(Array.isArray(data.courses) ? data.courses : []);
+    setLessonInstances(Array.isArray(data.lessonInstances) ? data.lessonInstances : []);
+    if (data.termStartDate) setTermStartDate(data.termStartDate);
+    if (data.currentTerm) setCurrentTerm(data.currentTerm);
+    showToast("Backup restored");
   }
 
   const installBanner = deferredPrompt && !dismissedInstall ? (
@@ -93,37 +147,62 @@ export default function App() {
         <Landing onStart={handleStart} />
       ) : (
         <AppShell
-          lessons={lessons}
-          setLessons={setLessons}
+          courses={courses}
+          tomorrowInstances={tomorrowInstances}
+          setLessonInstances={setLessonInstances}
           onToast={showToast}
           apiKey={apiKey}
           onOpenSettings={() => setShowSettings(true)}
           installBanner={installBanner}
-          onAddLesson={() => setLessonForm({ mode: "add" })}
-          onEditLesson={(lesson) => setLessonForm({ mode: "edit", lesson })}
+          onAddCourse={() => setCourseForm({ mode: "add" })}
+          onManageCourses={() => setManageCoursesOpen(true)}
           onShowHelp={() => setShowHelp(true)}
         />
       )}
+
       {toast && <Toast message={toast} onDone={() => setToast(null)} />}
+
       {showSettings && (
         <SettingsModal
           apiKey={apiKey}
-          onSave={(key) => {
-            setApiKey(key);
-            saveApiKey(key);
-            showToast(key ? "AI connected" : "AI key cleared");
-          }}
+          termStartDate={termStartDate}
+          currentTerm={currentTerm}
+          onSaveApiKey={(key) => { setApiKey(key); saveApiKey(key); showToast(key ? "AI connected" : "AI key cleared"); }}
+          onSaveTerm={(term, startDate) => { setCurrentTerm(term); setTermStartDate(startDate); showToast("Term settings saved"); }}
+          onExport={() => { exportBackup({ courses, lessonInstances, termStartDate, currentTerm }); showToast("Backup downloaded"); }}
+          onImport={handleImportBackup}
+          onToast={showToast}
           onClose={() => setShowSettings(false)}
         />
       )}
-      {lessonForm && (
+
+      {courseForm && (
         <LessonFormModal
-          lesson={lessonForm.mode === "edit" ? lessonForm.lesson : null}
-          onSave={handleSaveLesson}
-          onDelete={handleDeleteLesson}
-          onClose={() => setLessonForm(null)}
+          course={courseForm.mode === "edit" ? courseForm.course : null}
+          onSave={handleSaveCourse}
+          onDelete={handleDeleteCourse}
+          onManageSow={(course) => { setCourseForm(null); setSowCourse(course); }}
+          onClose={() => setCourseForm(null)}
         />
       )}
+
+      {manageCoursesOpen && (
+        <ManageCoursesModal
+          courses={courses}
+          onEdit={(course) => { setManageCoursesOpen(false); setCourseForm({ mode: "edit", course }); }}
+          onAdd={() => { setManageCoursesOpen(false); setCourseForm({ mode: "add" }); }}
+          onClose={() => setManageCoursesOpen(false)}
+        />
+      )}
+
+      {sowCourse && (
+        <SchemeOfWorkModal
+          course={sowCourse}
+          onSave={handleSaveSow}
+          onClose={() => setSowCourse(null)}
+        />
+      )}
+
       {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
     </>
   );
